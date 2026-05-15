@@ -5,14 +5,6 @@ import React, { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import * as XLSX from "xlsx";
 import Highcharts from "highcharts";
-import HighchartsExporting from "highcharts/modules/exporting";
-import HighchartsExportData from "highcharts/modules/export-data";
-
-// Habilitar módulos de exportación (PNG, PDF, CSV) en el cliente
-if (typeof window !== "undefined") {
-  HighchartsExporting(Highcharts);
-  HighchartsExportData(Highcharts);
-}
 
 const HighchartsReact = dynamic(
   () => import("highcharts-react-official"),
@@ -37,7 +29,14 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [chartOptions, setChartOptions] = useState({});
 
-  // Procesar datos (sirve tanto para archivos locales como para G-Sheets)
+  // SOLUCIÓN AL ERROR DE VERCEL: Cargar módulos de exportación de forma dinámica solo en el cliente
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      import("highcharts/modules/exporting").then((mod) => mod.default(Highcharts));
+      import("highcharts/modules/export-data").then((mod) => mod.default(Highcharts));
+    }
+  }, []);
+
   const processData = (data) => {
     if (data.length > 0) {
       const cols = Object.keys(data[0]);
@@ -48,7 +47,6 @@ export default function Home() {
     }
   };
 
-  // 1. Cargar archivo local (Excel/CSV)
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -63,7 +61,6 @@ export default function Home() {
     reader.readAsBinaryString(file);
   };
 
-  // 2. Cargar desde URL de Google Sheets (Publicado como CSV)
   const fetchGoogleSheet = async () => {
     if (!sheetUrl) return;
     setIsLoading(true);
@@ -80,10 +77,8 @@ export default function Home() {
     setIsLoading(false);
   };
 
-  // 3. Generar las opciones del gráfico Highcharts
   useEffect(() => {
     if (dataTable.length > 0 && xAxisCol && yAxisCol) {
-      // Lógica especial para gráficos circulares (Pie/Donut)
       const isPie = chartType === "pie" || chartType === "doughnut";
       
       let seriesData = [];
@@ -124,7 +119,7 @@ export default function Home() {
         },
         plotOptions: {
           pie: {
-            innerSize: chartType === "doughnut" ? '50%' : '0%', // Crea el efecto Donut
+            innerSize: chartType === "doughnut" ? '50%' : '0%',
             allowPointSelect: true,
             cursor: 'pointer',
             dataLabels: { enabled: true, format: '<b>{point.name}</b>: {point.percentage:.1f} %' }
@@ -132,7 +127,7 @@ export default function Home() {
         },
         series: [{
           name: yAxisCol,
-          colorByPoint: isPie, // Colores distintos para cada porción si es Pie
+          colorByPoint: isPie,
           data: seriesData
         }],
         credits: { 
@@ -148,7 +143,6 @@ export default function Home() {
     <div style={{ backgroundColor: "#f3f4f6", minHeight: "100vh", padding: "40px 20px", fontFamily: "sans-serif" }}>
       <div style={{ maxWidth: "1400px", margin: "0 auto" }}>
         
-        {/* Header Corporativo */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "30px", borderBottom: "2px solid #e5e7eb", paddingBottom: "20px" }}>
           <div>
             <h1 style={{ color: "#1e3a8a", margin: 0, fontSize: "28px", fontWeight: "bold" }}>Enterprise Data Visualizer</h1>
@@ -161,7 +155,6 @@ export default function Home() {
         
         <div style={{ display: "grid", gridTemplateColumns: "1fr 3fr", gap: "30px" }}>
           
-          {/* SIDEBAR: Panel de Control */}
           <div style={{ backgroundColor: "white", padding: "25px", borderRadius: "12px", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1)" }}>
             <h3 style={{ marginTop: 0, color: "#1f2937", borderBottom: "1px solid #eee", paddingBottom: "10px" }}>Data Source</h3>
             
@@ -235,11 +228,9 @@ export default function Home() {
             )}
           </div>
 
-          {/* ÁREA PRINCIPAL: Gráfico */}
           <div style={{ backgroundColor: "white", padding: "30px", borderRadius: "12px", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1)", display: "flex", flexDirection: "column" }}>
             {dataTable.length > 0 ? (
               <div style={{ flex: 1, position: "relative" }}>
-                 {/* El menú hamburguesa de descargar PNG/PDF aparecerá automáticamente arriba a la derecha */}
                 <HighchartsReact highcharts={Highcharts} options={chartOptions} />
               </div>
             ) : (
